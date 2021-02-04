@@ -185,8 +185,8 @@ async function main() {
         width: chartWidth,
         height: chartHeight,
         layout: {
-            textColor: "#d1d4dc",
-            backgroundColor: "#000000",
+            textColor: "#F653A2",
+            backgroundColor: "#0D106E",
         },
         timeScale: {
             timeVisible: true,
@@ -194,10 +194,10 @@ async function main() {
         },
         grid: {
             vertLines: {
-                color: "rgba(42, 46, 57, 0)",
+                color: "transparent",
             },
             horzLines: {
-                color: "rgba(42, 46, 57, 0)",
+                color: "transparent",
             },
         },
     })
@@ -209,7 +209,12 @@ async function main() {
     //     })
     //     .setData(series)
 
-    chart.addCandlestickSeries().setData(candles)
+    chart.addCandlestickSeries({
+        upColor: '#5EAFE1',
+        downColor: '#F653A2',
+        borderVisible: false,
+        wickVisible: true,
+    }).setData(candles)
 
 
     chart.timeScale().setVisibleRange({
