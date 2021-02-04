@@ -113,22 +113,22 @@ function swapsToCandles(swaps, bucket = 1600) {
             .map(t => byTimestamp[t])
             .flat()
             .sort((a, b) => a.time - b.time);
+        const close = candles.length ? candles[candles.length - 1].close : s[0].price;
         if (s.length) {
             candles.push({
                 time: i,
-                open: s[0].price,
+                open: close,
                 high: Math.max(...s.map(t => t.price)),
                 low: Math.min(...s.map(t => t.price)),
                 close: s[s.length - 1].price
             });
         } else {
-            const last = candles[candles.length - 1];
             candles.push({
                 time: i,
-                open: last.close,
-                high: last.close,
-                low: last.close,
-                close: last.close,
+                open: close,
+                high: close,
+                low: close,
+                close,
             });
         }
     }
