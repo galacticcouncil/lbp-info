@@ -13,14 +13,17 @@ const USDC_END_WEIGHT = 7
 const latestPriceId = "latest-price"
 const countdownId = "countdown"
 const diagramId = "price-prediction"
-const poolAddress = "0xbfb4b21887ebb3542bde0a9997d481debc6e072b"
+const poolAddress = "0xbfb4b21887ebb3542bde0a9997d481debc6e072b" // perp
+// const poolAddress = "0x38131a37f74a52141e14d7aef40a876066ffe25f" // tap
+// const poolAddress = "0x86eca06d0f1fec418fac3bd3ef5382a9f8981f0d" // apy
+// const poolAddress = "0xc99317ceef9ed2ab9ff0ec99f64f3dd61b09a6b2" // furucombo
 const crpAddress = "0x91ACcD0BC2aAbAB1d1b297EB64C4774bC4e7bcCE" // perp
-// const crpAddress = "0x64010f6ba757715D8f12d8317004425d73cA5a81" // tap
 const usdcAddress = "0xax0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 const perpAddress = "0xbC396689893D065F41bc2C6EcbeE5e0085233447"
 
 const graphApi = 'https://api.thegraph.com/subgraphs/name/balancer-labs/balancer';
-const stablecoin = 'USDC';
+const stablecoin = 'USDC'; // perp
+// const stablecoin = 'DAI'; // tap
 
 const timezoneOffset = new Date().getTimezoneOffset() * 60
 const forecastPrices = [
