@@ -102,6 +102,39 @@ function swapsToSeries(swaps) {
     return series;
 }
 
+function swapsToCandles(swaps, bucket = 1600) {
+    const byTimestamp = groupBy(swaps, 'timestamp');
+    const timestamps = Object.keys(byTimestamp).sort();
+    const from = Number(timestamps[0]);
+    const to = Number(timestamps[timestamps.length - 1]);
+    let candles = [];
+    for (let i = from; i < to; i += bucket) {
+        let s = timestamps.filter(t => t >= i && t < i + bucket)
+            .map(t => byTimestamp[t])
+            .flat()
+            .sort((a, b) => a.time - b.time);
+        if (s.length) {
+            candles.push({
+                time: i,
+                open: s[0].price,
+                high: Math.max(...s.map(t => t.price)),
+                low: Math.min(...s.map(t => t.price)),
+                close: s[s.length - 1].price
+            });
+        } else {
+            const last = candles[candles.length - 1];
+            candles.push({
+                time: i,
+                open: last.close,
+                high: last.close,
+                low: last.close,
+                close: last.close,
+            });
+        }
+    }
+    return candles;
+}
+
 async function getLatestPrice() {
     const abi = ["function getSpotPrice(address tokenIn, address tokenOut) view returns (uint)"]
     const provider = ethers.getDefaultProvider()
@@ -137,7 +170,8 @@ async function main() {
     const pool = await fetchPool();
     const swaps = await fetchAllSwaps(Number(pool.swapsCount));
     const series = swapsToSeries(swaps);
-    console.log({swaps, pool, series});
+    const candles = swapsToCandles(swaps);
+    console.log({swaps, pool, series, candles});
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -168,12 +202,14 @@ async function main() {
         },
     })
 
-    chart
-        .addLineSeries({
-            color: "rgb(255,8,8)",
-            lineWidth: 2,
-        })
-        .setData(series)
+    // chart
+    //     .addLineSeries({
+    //         color: "rgb(255,8,8)",
+    //         lineWidth: 2,
+    //     })
+    //     .setData(series)
+
+    chart.addCandlestickSeries().setData(candles)
 
 
     chart.timeScale().setVisibleRange({
