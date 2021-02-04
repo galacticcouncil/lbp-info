@@ -4,7 +4,7 @@ const fromBlock = 10_825_600
 const toBlock = 10_846_450
 const blockDuration = 15
 const indexingInterval = 300
-const defaultDiagramWidth = 600
+const defaultDiagramWidth = 900
 const defaultDiagramHeight = 400
 const PERP_START_WEIGHT = 9
 const USDC_START_WEIGHT = 1
@@ -18,6 +18,9 @@ const crpAddress = "0x91ACcD0BC2aAbAB1d1b297EB64C4774bC4e7bcCE" // perp
 // const crpAddress = "0x64010f6ba757715D8f12d8317004425d73cA5a81" // tap
 const usdcAddress = "0xax0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 const perpAddress = "0xbC396689893D065F41bc2C6EcbeE5e0085233447"
+
+const graphApi = 'https://api.thegraph.com/subgraphs/name/balancer-labs/balancer';
+const stablecoin = 'USDC';
 
 const timezoneOffset = new Date().getTimezoneOffset() * 60
 const forecastPrices = [
@@ -96,23 +99,92 @@ const forecastPrices = [
     0.0762,
 ]
 
-// generate historicData every 5 minutes (300 seconds)
-function generateHistoricResult(from, fromBlock, currentBlock) {
-    const result = []
-    let prevUsdc = 0
-    for (let i = 0; i < currentBlock - fromBlock; i++) {
-        if ((i * blockDuration) % indexingInterval === 0) {
-            const currentUsdc = prevUsdc + (Math.random() - 0.5) / 10
-            result.push({
-                block: i + fromBlock,
-                timestamp: from.plus({ seconds: i * blockDuration }).toSeconds(),
-                perpBalance: "1",
-                usdcBalance: currentUsdc.toString(),
-            })
-            prevUsdc = currentUsdc
-        }
-    }
-    return result
+function groupBy(xs, key) {
+    return xs.reduce(function(rv, x) {
+        (rv[x[key]] = rv[x[key]] || []).push(x);
+        return rv;
+    }, {});
+}
+
+async function fetchPool() {
+    return fetch(graphApi, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            query: `
+                query {
+                  pools(where: {id: "${poolAddress}"}) {
+                    swapsCount,
+                    tokens {
+                      symbol
+                      balance
+                      denormWeight
+                    },
+                    holdersCount
+                  }
+                }
+            `,
+        }),
+    }).then(res => res.json()).then(res => res.data.pools[0])
+}
+
+async function fetchSwaps(skip = 0) {
+    return fetch(graphApi, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            query: `
+                query {
+                  pools(where: {id: "${poolAddress}"}) {
+                    swaps(first: 1000, skip: ${skip}, orderBy: timestamp, orderDirection: asc) {
+                      timestamp
+                      id
+                      tokenIn
+                      tokenInSym
+                      tokenAmountIn
+                      tokenOut
+                      tokenOutSym
+                      tokenAmountOut
+                      userAddress {
+                        id
+                      }
+                    }
+                  }
+                }
+            `,
+        }),
+    }).then(res => res.json()).then(res => res.data.pools[0].swaps.map(swap => ({...swap, price: swapPrice(swap)})))
+}
+
+function swapPrice({tokenAmountIn, tokenAmountOut, tokenInSym}) {
+    return tokenInSym === stablecoin
+        ? Number(tokenAmountIn) / Number(tokenAmountOut)
+        : Number(tokenAmountOut) / Number(tokenAmountIn);
+}
+
+async function fetchAllSwaps(count) {
+    let i = 0;
+    let calls = [];
+    do {
+        calls.push(fetchSwaps(i));
+        i += 1000;
+    } while (i < count);
+    return Promise.all(calls).then(calls => calls.flat())
+}
+
+function swapsToSeries(swaps) {
+    const byTimestamp = groupBy(swaps, 'timestamp');
+    const series = [];
+    Object.values(byTimestamp).forEach(swaps => {
+       swaps.sort((a, b) => b.price - a.price);
+       series.push({ time: swaps[0].timestamp, value: swaps[0].price });
+    });
+    series.sort((a, b) => a.time - b.time);
+    return series;
 }
 
 function fetchHistoricData() {
@@ -202,44 +274,47 @@ async function main() {
             time: timestamp - timezoneOffset,
             value: getPrice(usdcBalance, usdcWeight, perpBalance, perpWeight),
         }))
-    console.log({historicData, historicResult});
-    const { usdcBalance, perpBalance } = historicResult.slice().pop()
-    const fromTimeCountdown = await fetchCountdown(fromBlock).then(res => res.json())
-    let cursorBlock = currentBlock >= fromBlock ? currentBlock : fromBlock
-    let cursorTime =
-        currentBlock >= fromBlock
-            ? now
-            : now.plus({ seconds: fromTimeCountdown.result.EstimateTimeInSec })
-
-    while (cursorBlock < toBlock) {
-        const ratio = (cursorBlock - fromBlock) / totalBlock
-        const perpWeight = (PERP_END_WEIGHT - PERP_START_WEIGHT) * ratio + PERP_START_WEIGHT
-        const usdcWeight = (USDC_END_WEIGHT - USDC_START_WEIGHT) * ratio + USDC_START_WEIGHT
-        const cursorHour = Math.floor(((cursorBlock - fromBlock) * blockDuration) / 60 / 60)
-        if (!forecastPrices[cursorHour] === undefined) {
-            break
-        }
-        forecastData.push({
-            time: cursorTime.toSeconds() - timezoneOffset,
-            value: getPrice(usdcBalance, usdcWeight, perpBalance, perpWeight),
-        })
-
-        cursorBlock += indexingInterval / blockDuration
-        cursorTime = cursorTime.plus({ seconds: indexingInterval })
-    }
-    const countDownResponse = await fetchCountdown(toBlock).then(res => res.json())
-    const estimateEnd = now.plus({ seconds: countDownResponse.result.EstimateTimeInSec })
-
-    document.getElementById(latestPriceId).textContent = await getLatestPrice().catch(() => historicData[historicData.length - 1].value);
-
-    const countdownDiv = document.getElementById(countdownId)
-
-    window.setInterval(() => {
-        const now = luxon.DateTime.local()
-        const diff = estimateEnd.diff(now)
-        const [days, hours, minutes, seconds] = diff.toFormat("d h m s").split(" ")
-        countdownDiv.textContent = `${days} days ${hours} hours ${minutes} minutes ${seconds} seconds`
-    }, 1000)
+    const pool = await fetchPool();
+    const swaps = await fetchAllSwaps(Number(pool.swapsCount));
+    const series = swapsToSeries(swaps);
+    console.log({historicData, historicResult, swaps, pool, series});
+    // const { usdcBalance, perpBalance } = historicResult.slice().pop()
+    // const fromTimeCountdown = await fetchCountdown(fromBlock).then(res => res.json())
+    // let cursorBlock = currentBlock >= fromBlock ? currentBlock : fromBlock
+    // let cursorTime =
+    //     currentBlock >= fromBlock
+    //         ? now
+    //         : now.plus({ seconds: fromTimeCountdown.result.EstimateTimeInSec })
+    //
+    // while (cursorBlock < toBlock) {
+    //     const ratio = (cursorBlock - fromBlock) / totalBlock
+    //     const perpWeight = (PERP_END_WEIGHT - PERP_START_WEIGHT) * ratio + PERP_START_WEIGHT
+    //     const usdcWeight = (USDC_END_WEIGHT - USDC_START_WEIGHT) * ratio + USDC_START_WEIGHT
+    //     const cursorHour = Math.floor(((cursorBlock - fromBlock) * blockDuration) / 60 / 60)
+    //     if (!forecastPrices[cursorHour] === undefined) {
+    //         break
+    //     }
+    //     forecastData.push({
+    //         time: cursorTime.toSeconds() - timezoneOffset,
+    //         value: getPrice(usdcBalance, usdcWeight, perpBalance, perpWeight),
+    //     })
+    //
+    //     cursorBlock += indexingInterval / blockDuration
+    //     cursorTime = cursorTime.plus({ seconds: indexingInterval })
+    // }
+    // const countDownResponse = await fetchCountdown(toBlock).then(res => res.json())
+    // const estimateEnd = now.plus({ seconds: countDownResponse.result.EstimateTimeInSec })
+    //
+    // document.getElementById(latestPriceId).textContent = await getLatestPrice().catch(() => historicData[historicData.length - 1].value);
+    //
+    // const countdownDiv = document.getElementById(countdownId)
+    //
+    // window.setInterval(() => {
+    //     const now = luxon.DateTime.local()
+    //     const diff = estimateEnd.diff(now)
+    //     const [days, hours, minutes, seconds] = diff.toFormat("d h m s").split(" ")
+    //     countdownDiv.textContent = `${days} days ${hours} hours ${minutes} minutes ${seconds} seconds`
+    // }, 1000)
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -258,6 +333,7 @@ async function main() {
         },
         timeScale: {
             timeVisible: true,
+            barSpacing: 1,
         },
         grid: {
             vertLines: {
@@ -269,22 +345,37 @@ async function main() {
         },
     })
 
-    chart
-        .addLineSeries({
-            color: "rgba(4, 111, 232, 1)",
-            lineWidth: 2,
-        })
-        .setData(historicData)
+    // chart
+    //     .addLineSeries({
+    //         color: "rgba(4, 111, 232, 1)",
+    //         lineWidth: 2,
+    //     })
+    //     .setData(historicData)
 
     chart
         .addLineSeries({
-            color: "rgba(255, 255, 255, 0.4)",
+            color: "rgb(255,8,8)",
             lineWidth: 2,
-            lineStyle: 2,
         })
-        .setData(forecastData)
+        // .setData(series.slice(0, 1000))
+        .setData(series)
 
-    chart.timeScale().fitContent()
+    // chart
+    //     .addLineSeries({
+    //         color: "rgba(255, 0, 255, 0.4)",
+    //         lineWidth: 2,
+    //         lineStyle: 2,
+    //     })
+    //     .setData(forecastData)
+
+
+    chart.timeScale().setVisibleRange({
+        from: series[0].time,
+        to: series[series.length - 1].time,
+    });
+    // chart.timeScale().fitContent()
+
+    console.log(chart.timeScale().options());
 }
 
 main()
