@@ -225,10 +225,13 @@ async function main() {
         borderVisible: false,
         wickVisible: true,
     }).setData(candles)
-    chart.addLineSeries().setData(predicted)
     chart.addLineSeries({
-        color: "rgb(255,8,8)",
-        lineWidth: 2,
+        color: '#F653A2',
+        lineWidth: 1,
+    }).setData(predicted)
+    chart.addLineSeries({
+        color: '#5EAFE1',
+        lineWidth: 1,
     }).setData(future)
 
 
