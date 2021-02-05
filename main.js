@@ -17,14 +17,15 @@ const bucket = 1600;
 const params = {
     start: {
         time: 1599628888,
-        weights: [9, 1]
+        weights: [9, 1],
+        balances: [7500000, 1333333]
     },
     end: {
         time: 1599904979,
         weights: [3, 7]
     }
 };
-let balances = [7500000, 1333333];
+let balances = params.start.balances;
 
 const series = {data:[]};
 const swaps = [];
@@ -52,9 +53,12 @@ function spotPrice(balances, w, lotSize = 2000, fee = 0.001 / 100) {
     return balances[1] * (Math.pow(balances[0] / (balances[0] - lotSize), w[0] / w[1]) - 1) / (1 - fee) / lotSize;
 }
 
-function saleRate(lastBuckets = 15) {
-    return -1 * swaps.filter(s => s.timestamp + bucket * 10 > series.data[series.data.length - 1].time)
+function saleRate(lastBuckets = 10) {
+    const currentBucket = series.data[series.data.length - 1].time;
+    const calculated = -1 * swaps.filter(s => s.timestamp + bucket * 10 > currentBucket)
         .reduce((a, { deltas }) => a + deltas[0], 0) / lastBuckets;
+    const max = (params.start.balances[0] * 0.77 - (params.start.balances[0] - balances[0])) / ((params.end.time - currentBucket) / bucket);
+    return Math.min(max, calculated);
 }
 
 function groupBy(xs, key) {
