@@ -14,8 +14,48 @@ const stablecoin = 'USDC'; // perp
 // const stablecoin = 'DAI'; // tap
 
 const bucket = 1600;
+const params = {
+    start: {
+        time: 1599628888,
+        weights: [9, 1]
+    },
+    end: {
+        time: 1599904979,
+        weights: [3, 7]
+    }
+};
+let balances = [7500000, 1333333];
 
-const series = {};
+const series = {data:[]};
+const swaps = [];
+
+const weights = (() => {
+    const start = params.start.weights;
+    const end = params.end.weights;
+    let time = params.start.time;
+    const res = {
+        [time]: start,
+        [params.end.time]: end
+    };
+    const steps = Math.ceil((params.end.time - params.start.time) / bucket);
+    for (let i = 1; i < steps; i++) {
+        time += bucket;
+        res[time] = [
+            start[0] - i / steps * (start[0] - end[0]),
+            start[1] + i / steps * (end[1] - start[1])
+        ];
+    }
+    return res;
+})();
+
+function spotPrice(balances, w, lotSize = 2000, fee = 0.001 / 100) {
+    return balances[1] * (Math.pow(balances[0] / (balances[0] - lotSize), w[0] / w[1]) - 1) / (1 - fee) / lotSize;
+}
+
+function saleRate(lastBuckets = 15) {
+    return -1 * swaps.filter(s => s.timestamp + bucket * 10 > series.data[series.data.length - 1].time)
+        .reduce((a, { deltas }) => a + deltas[0], 0) / lastBuckets;
+}
 
 function groupBy(xs, key) {
     return xs.reduce(function(rv, x) {
@@ -75,13 +115,21 @@ async function fetchSwaps(skip = 0) {
                 }
             `,
         }),
-    }).then(res => res.json()).then(res => res.data.pools[0].swaps.map(swap => ({...swap, price: swapPrice(swap)})))
+    }).then(res => res.json()).then(res => res.data.pools[0].swaps.map(calculateSwap))
 }
 
-function swapPrice({tokenAmountIn, tokenAmountOut, tokenInSym}) {
-    return tokenInSym === stablecoin
-        ? Number(tokenAmountIn) / Number(tokenAmountOut)
-        : Number(tokenAmountOut) / Number(tokenAmountIn);
+function calculateSwap(swap) {
+    const tokenAmountIn = Number(swap.tokenAmountIn);
+    const tokenAmountOut = Number(swap.tokenAmountOut);
+    let price, deltas;
+    if (swap.tokenInSym === stablecoin) {
+        price = tokenAmountIn / tokenAmountOut;
+        deltas = [-tokenAmountOut, tokenAmountIn];
+    } else {
+        price = tokenAmountOut / tokenAmountIn;
+        deltas = [tokenAmountIn, -tokenAmountOut]
+    }
+    return {...swap, price, deltas};
 }
 
 async function fetchAllSwaps(count) {
@@ -94,79 +142,51 @@ async function fetchAllSwaps(count) {
     return Promise.all(calls).then(calls => calls.flat())
 }
 
-function swapsToSeries(swaps) {
-    const byTimestamp = groupBy(swaps, 'timestamp');
-    const series = [];
-    Object.values(byTimestamp).forEach(swaps => {
-       swaps.sort((a, b) => b.price - a.price);
-       series.push({ time: swaps[0].timestamp, value: swaps[0].price });
-    });
-    series.sort((a, b) => a.time - b.time);
-    return series;
-}
-
-function swapsToCandles(swaps) {
-    const byTimestamp = groupBy(swaps, 'timestamp');
-    const timestamps = Object.keys(byTimestamp).sort();
-    const from = Number(timestamps[0]);
-    const to = Number(timestamps[timestamps.length - 1]);
-    let candles = [];
-    for (let i = from; i < to; i += bucket) {
-        let s = timestamps.filter(t => t >= i && t < i + bucket)
-            .map(t => byTimestamp[t])
-            .flat()
-            .sort((a, b) => a.time - b.time);
-        const close = candles.length ? candles[candles.length - 1].close : s[0].price;
-        if (s.length) {
-            candles.push({
-                time: i,
-                open: close,
-                high: Math.max(...s.map(t => t.price)),
-                low: Math.min(...s.map(t => t.price)),
-                close: s[s.length - 1].price
-            });
-        } else {
-            candles.push({
-                time: i,
-                open: close,
-                high: close,
-                low: close,
-                close,
-            });
-        }
-    }
-    return candles;
-}
-
-function predictPrice(coeficient = 1.02, endTime = 1599904979) {
+function predictPrice(rate = 0) {
     const swaps = series.data;
-    const { time, close } = swaps[swaps.length - 1];
-    const future = [{ time, value: close }];
-    for (let i = time + bucket; i < endTime; i += bucket) {
-        future.push({time: i, value: future[future.length - 1].value / coeficient});
+    const { time } = swaps[swaps.length - 1];
+    const b = [...balances];
+    const future = [{ time, value: series.data[series.data.length - 1].close }];
+    for (let i = time + bucket; i < params.end.time; i += bucket) {
+        future.push({ time: i, value: spotPrice(b, weights[i]) });
+        if (rate) {
+            const price = spotPrice(b, weights[i], rate);
+            b[0] -= rate;
+            b[1] += rate * price;
+        }
     }
     return future;
 }
 
-function updatePrice(price, time = Number(new Date()) / 1000) {
+function updatePrice(swap) {
+    const render = !!series.candle;
     const bar = series.data[series.data.length - 1];
-    if (time >= bar.time + bucket) {
+    const { timestamp, price } = swap;
+    if (!bar || timestamp >= bar.time + bucket) {
         const newBar = {};
-        newBar.open = bar.close;
+        newBar.open = bar ? bar.close : price;
         newBar.high = price;
         newBar.low = price;
         newBar.close = price;
-        newBar.time = bar.time + bucket;
+        newBar.time = bar ? bar.time + bucket : timestamp;
         series.data.push(newBar);
-        series.candle.setData(series.data);
+        if (render) {
+            series.candle.setData(series.data);
+        }
     } else {
         bar.close = price;
         bar.high = Math.max(bar.high, price);
         bar.low = Math.min(bar.low, price);
-        series.candle.update(bar);
+        if (render) {
+            series.candle.update(bar);
+        }
     }
-    series.predicted.setData(predictPrice(1.005));
-    series.worstCase.setData(predictPrice());
+    balances = balances.map((b, i) => b + swap.deltas[i]);
+    swaps.push(swap);
+    if (render) {
+        series.predicted.setData(predictPrice(saleRate()));
+        series.worstCase.setData(predictPrice());
+    }
 }
 
 async function getLatestPrice() {
@@ -200,16 +220,17 @@ function getPrice(dai, daiWeight, xhdx, xhdxWeight) {
 async function main() {
     const provider = ethers.getDefaultProvider();
     const currentBlock = await provider.getBlockNumber();
-    console.log({currentBlock});
+    console.log({ currentBlock });
     const pool = await fetchPool();
     const swaps = await fetchAllSwaps(Number(pool.swapsCount));
-    let candles = swapsToCandles(swaps);
-    console.log({swaps, pool, candles});
+    console.log({ swaps, pool });
 
-    // TODO remove
-    candles = candles.slice(0, candles.length/2);
+    const half = (params.end.time - params.start.time) / 3 + params.start.time;
+    const past = swaps.filter(s => s.timestamp <= half);
+    past.map(updatePrice)
 
-    series.data = candles;
+    const next = swaps.filter(s => s.timestamp > half);
+    setInterval(() => updatePrice(next.shift()), 100);
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -219,7 +240,7 @@ async function main() {
         chartHeight = (chartWidth * defaultDiagramHeight) / defaultDiagramWidth
     }
 
-    var chart = LightweightCharts.createChart(document.getElementById(diagramId), {
+    const chart = LightweightCharts.createChart(document.getElementById(diagramId), {
         width: chartWidth,
         height: chartHeight,
         layout: {
@@ -240,6 +261,8 @@ async function main() {
         },
     });
 
+    series.chart = chart;
+
     series.candle = chart.addCandlestickSeries({
         upColor: '#5EAFE1',
         wickUpColor: '#5EAFE1',
@@ -248,7 +271,7 @@ async function main() {
         borderVisible: false,
         wickVisible: true,
     })
-    series.candle.setData(candles);
+    series.candle.setData(series.data);
 
     series.worstCase = chart.addLineSeries({
         color: '#F653A2',
@@ -261,15 +284,13 @@ async function main() {
         color: '#5EAFE1',
         lineWidth: 1,
     });
-    series.predicted.setData(predictPrice(1.005));
+    series.predicted.setData(predictPrice(saleRate()));
 
 
     chart.timeScale().setVisibleRange({
-        from: Math.min(candles[0].time, predicted[0].time),
-        to: Math.max(candles[candles.length-1].time, predicted[predicted.length-1].time),
+        from: params.start.time,
+        to: params.end.time
     });
-
-    console.log(chart.timeScale().options());
 }
 
 main()
