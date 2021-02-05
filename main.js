@@ -15,6 +15,8 @@ const stablecoin = 'USDC'; // perp
 
 const bucket = 1600;
 
+const series = {};
+
 function groupBy(xs, key) {
     return xs.reduce(function(rv, x) {
         (rv[x[key]] = rv[x[key]] || []).push(x);
@@ -136,13 +138,35 @@ function swapsToCandles(swaps) {
     return candles;
 }
 
-function predictPrice(swaps, coeficient = 1.02, endTime = 1599904979) {
+function predictPrice(coeficient = 1.02, endTime = 1599904979) {
+    const swaps = series.data;
     const { time, close } = swaps[swaps.length - 1];
     const future = [{ time, value: close }];
     for (let i = time + bucket; i < endTime; i += bucket) {
         future.push({time: i, value: future[future.length - 1].value / coeficient});
     }
     return future;
+}
+
+function updatePrice(price, time = Number(new Date()) / 1000) {
+    const bar = series.data[series.data.length - 1];
+    if (time >= bar.time + bucket) {
+        const newBar = {};
+        newBar.open = bar.close;
+        newBar.high = price;
+        newBar.low = price;
+        newBar.close = price;
+        newBar.time = bar.time + bucket;
+        series.data.push(newBar);
+        series.candle.setData(series.data);
+    } else {
+        bar.close = price;
+        bar.high = Math.max(bar.high, price);
+        bar.low = Math.min(bar.low, price);
+        series.candle.update(bar);
+    }
+    series.predicted.setData(predictPrice(1.005));
+    series.worstCase.setData(predictPrice());
 }
 
 async function getLatestPrice() {
@@ -179,16 +203,13 @@ async function main() {
     console.log({currentBlock});
     const pool = await fetchPool();
     const swaps = await fetchAllSwaps(Number(pool.swapsCount));
-    const series = swapsToSeries(swaps);
     let candles = swapsToCandles(swaps);
-    console.log({swaps, pool, series, candles});
+    console.log({swaps, pool, candles});
 
     // TODO remove
     candles = candles.slice(0, candles.length/2);
 
-    const predicted = predictPrice(candles);
-    const future = predictPrice(candles, 1.005);
-    console.log(predicted)
+    series.data = candles;
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -219,20 +240,28 @@ async function main() {
         },
     });
 
-    chart.addCandlestickSeries({
+    series.candle = chart.addCandlestickSeries({
         upColor: '#5EAFE1',
+        wickUpColor: '#5EAFE1',
         downColor: '#F653A2',
+        wickDownColor: '#F653A2',
         borderVisible: false,
         wickVisible: true,
-    }).setData(candles)
-    chart.addLineSeries({
+    })
+    series.candle.setData(candles);
+
+    series.worstCase = chart.addLineSeries({
         color: '#F653A2',
         lineWidth: 1,
-    }).setData(predicted)
-    chart.addLineSeries({
+    });
+    const predicted = predictPrice();
+    series.worstCase.setData(predicted);
+
+    series.predicted = chart.addLineSeries({
         color: '#5EAFE1',
         lineWidth: 1,
-    }).setData(future)
+    });
+    series.predicted.setData(predictPrice(1.005));
 
 
     chart.timeScale().setVisibleRange({
