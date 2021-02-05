@@ -9,10 +9,11 @@ const poolAddress = "0xbfb4b21887ebb3542bde0a9997d481debc6e072b" // perp
 // const poolAddress = "0xc99317ceef9ed2ab9ff0ec99f64f3dd61b09a6b2" // furucombo
 const daiAddress = "0xax0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
 const xhdxAddress = "0xbC396689893D065F41bc2C6EcbeE5e0085233447"
-
 const graphApi = 'https://api.thegraph.com/subgraphs/name/balancer-labs/balancer';
 const stablecoin = 'USDC'; // perp
 // const stablecoin = 'DAI'; // tap
+
+const bucket = 1600;
 
 function groupBy(xs, key) {
     return xs.reduce(function(rv, x) {
@@ -102,7 +103,7 @@ function swapsToSeries(swaps) {
     return series;
 }
 
-function swapsToCandles(swaps, bucket = 1600) {
+function swapsToCandles(swaps) {
     const byTimestamp = groupBy(swaps, 'timestamp');
     const timestamps = Object.keys(byTimestamp).sort();
     const from = Number(timestamps[0]);
@@ -133,6 +134,15 @@ function swapsToCandles(swaps, bucket = 1600) {
         }
     }
     return candles;
+}
+
+function predictPrice(swaps, coeficient = 1.02, endTime = 1599904979) {
+    const { time, close } = swaps[swaps.length - 1];
+    const future = [{ time, value: close }];
+    for (let i = time + bucket; i < endTime; i += bucket) {
+        future.push({time: i, value: future[future.length - 1].value / coeficient});
+    }
+    return future;
 }
 
 async function getLatestPrice() {
@@ -170,8 +180,15 @@ async function main() {
     const pool = await fetchPool();
     const swaps = await fetchAllSwaps(Number(pool.swapsCount));
     const series = swapsToSeries(swaps);
-    const candles = swapsToCandles(swaps);
+    let candles = swapsToCandles(swaps);
     console.log({swaps, pool, series, candles});
+
+    // TODO remove
+    candles = candles.slice(0, candles.length/2);
+
+    const predicted = predictPrice(candles);
+    const future = predictPrice(candles, 1.005);
+    console.log(predicted)
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -200,14 +217,7 @@ async function main() {
                 color: "transparent",
             },
         },
-    })
-
-    // chart
-    //     .addLineSeries({
-    //         color: "rgb(255,8,8)",
-    //         lineWidth: 2,
-    //     })
-    //     .setData(series)
+    });
 
     chart.addCandlestickSeries({
         upColor: '#5EAFE1',
@@ -215,11 +225,16 @@ async function main() {
         borderVisible: false,
         wickVisible: true,
     }).setData(candles)
+    chart.addLineSeries().setData(predicted)
+    chart.addLineSeries({
+        color: "rgb(255,8,8)",
+        lineWidth: 2,
+    }).setData(future)
 
 
     chart.timeScale().setVisibleRange({
-        from: series[0].time,
-        to: series[series.length - 1].time,
+        from: Math.min(candles[0].time, predicted[0].time),
+        to: Math.max(candles[candles.length-1].time, predicted[predicted.length-1].time),
     });
 
     console.log(chart.timeScale().options());
