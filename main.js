@@ -73,6 +73,30 @@ function saleRate(lastBuckets = 10) {
   );
 }
 
+async function getLatestPrice() {
+  const abi = [
+    "function getSpotPrice(address tokenIn, address tokenOut) view returns (uint)",
+  ];
+  const provider = ethers.getDefaultProvider();
+  const pool = new ethers.Contract(poolAddress, abi, provider);
+  const usdcDecimals = 6;
+  const rawPrice = await pool.getSpotPrice(daiAddress, xhdxAddress);
+  const price = Number.parseFloat(
+      ethers.utils.formatUnits(rawPrice, usdcDecimals)
+  );
+
+  return price.toFixed(4);
+}
+
+function fetchCountdown(block) {
+  const ETHERSCAN_APIKEY = "C9KKK6QF3REYE2UKRZKF5GFB2R2FQ5BWRE";
+  const url =
+      `https://api.etherscan.io/api` +
+      `?module=block&action=getblockcountdown&` +
+      `blockno=${block}&apikey=${ETHERSCAN_APIKEY}`;
+  return fetch(url);
+}
+
 async function fetchPool() {
   return fetch(graphApi, {
     method: "POST",
@@ -157,14 +181,15 @@ async function fetchAllSwaps(count) {
 
 function predictPrice(rate = 0) {
   const swaps = series.data;
-  const { time } = swaps[swaps.length - 1];
+  const lastSwap = swaps[swaps.length - 1]
+  const { time } = lastSwap || params.start;
   const b = [...balances];
   let over = false;
-  const lastPrice = series.data[series.data.length - 1].close;
-  const future = [{ time, value: lastPrice }];
+  const { close } = lastSwap || { close: spotPrice(b, params.start.weights) };
+  const future = [{ time, value: close }];
   for (let i = time + bucket; i < params.end.time; i += bucket) {
     let price = spotPrice(b, weights[i]);
-    if (price > lastPrice * 2) {
+    if (price > close * 2) {
       price = undefined;
       over = true;
     }
@@ -209,40 +234,7 @@ function updatePrice(swap) {
   }
 }
 
-async function getLatestPrice() {
-  const abi = [
-    "function getSpotPrice(address tokenIn, address tokenOut) view returns (uint)",
-  ];
-  const provider = ethers.getDefaultProvider();
-  const pool = new ethers.Contract(poolAddress, abi, provider);
-  const usdcDecimals = 6;
-  const rawPrice = await pool.getSpotPrice(daiAddress, xhdxAddress);
-  const price = Number.parseFloat(
-    ethers.utils.formatUnits(rawPrice, usdcDecimals)
-  );
-
-  return price.toFixed(4);
-}
-
-function fetchCountdown(block) {
-  const ETHERSCAN_APIKEY = "C9KKK6QF3REYE2UKRZKF5GFB2R2FQ5BWRE";
-  const url =
-    `https://api.etherscan.io/api` +
-    `?module=block&action=getblockcountdown&` +
-    `blockno=${block}&apikey=${ETHERSCAN_APIKEY}`;
-  return fetch(url);
-}
-
 async function main() {
-  const swaps = await fetchAllSwaps(5000);
-
-  const half = (params.end.time - params.start.time) / 3 + params.start.time;
-  const past = swaps.filter((s) => s.timestamp <= half);
-  past.map(updatePrice);
-
-  const next = swaps.filter((s) => s.timestamp > half);
-  setInterval(() => updatePrice(next.shift()), 320);
-
   let chartWidth = defaultDiagramWidth;
   let chartHeight = defaultDiagramHeight;
 
@@ -281,7 +273,7 @@ async function main() {
         },
       },
     }
-  );
+  )
 
   series.chart = chart;
 
@@ -293,30 +285,38 @@ async function main() {
     borderVisible: false,
     wickVisible: true,
   });
-  series.candle.setData(series.data);
 
   series.worstCase = chart.addLineSeries({
-    lineStyle: 4,
+    lineStyle: 1,
     priceLineVisible: false,
     lastValueVisible: false,
     color: "#F653A2",
-    lineWidth: 1,
+    lineWidth: 2,
   });
-  const predicted = predictPrice();
-  series.worstCase.setData(predicted);
 
   series.predicted = chart.addLineSeries({
-    lineStyle: 4,
+    lineStyle: 1,
     priceLineVisible: false,
     lastValueVisible: false,
     color: "#5EAFE1",
-    lineWidth: 1,
+    lineWidth: 2,
   });
-  series.predicted.setData(predictPrice(saleRate()));
 
-  chart.timeScale().setVisibleRange({
-    from: params.start.time,
-    to: params.end.time,
+  fetchAllSwaps(5000).then(swaps => {
+    const half = (params.end.time - params.start.time) / 3 + params.start.time;
+    const past = swaps.filter((s) => s.timestamp <= half);
+    if (past.length) {
+      past.map(updatePrice);
+    } else {
+      updatePrice({ timestamp: params.start.time, price: spotPrice(balances, params.start.weights), deltas: [0, 0] });
+    }
+    series.chart.timeScale().setVisibleRange({
+      from: params.start.time,
+      to: params.end.time,
+    });
+
+    const next = swaps.filter((s) => s.timestamp > half);
+    setInterval(() => updatePrice(next.shift()), 40);
   });
 
   window.addEventListener("resize", () => {
