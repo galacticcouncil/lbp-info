@@ -31,6 +31,8 @@ let balances = params.start.balances;
 const series = { data: [] };
 const swaps = [];
 
+const priceEl = document.getElementById('price');
+
 const weights = (() => {
   const start = params.start.weights;
   const end = params.end.weights;
@@ -200,6 +202,7 @@ function updatePrice(swap) {
   }
   balances = balances.map((b, i) => b + swap.deltas[i]);
   swaps.push(swap);
+  priceEl.innerHTML = `${price.toFixed(2)} DAI`;
   if (render) {
     series.predicted.setData(predictPrice(saleRate()));
     series.worstCase.setData(predictPrice());
@@ -238,7 +241,7 @@ async function main() {
   past.map(updatePrice);
 
   const next = swaps.filter((s) => s.timestamp > half);
-  setInterval(() => updatePrice(next.shift()), 20);
+  setInterval(() => updatePrice(next.shift()), 320);
 
   let chartWidth = defaultDiagramWidth;
   let chartHeight = defaultDiagramHeight;
