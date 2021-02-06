@@ -212,12 +212,7 @@ function fetchCountdown(block) {
 }
 
 async function main() {
-    const provider = ethers.getDefaultProvider();
-    const currentBlock = await provider.getBlockNumber();
-    console.log({ currentBlock });
-    const pool = await fetchPool();
-    const swaps = await fetchAllSwaps(Number(pool.swapsCount));
-    console.log({ swaps, pool });
+    const swaps = await fetchAllSwaps(5000);
 
     const half = (params.end.time - params.start.time) / 3 + params.start.time;
     const past = swaps.filter(s => s.timestamp <= half);
