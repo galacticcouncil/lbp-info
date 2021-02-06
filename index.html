@@ -1,21 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        html, body {
-            background-color: black;
-            color:white;
-        }
-    </style>
-</head>
-<body>
-    <div id="price-prediction"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>HydraDX</title>
+
+    <meta property="og:title" content="HydraDX" />
+    <meta property="og:locale" content="en_US" />
+    <meta name="description" content="Liquidity is the key" />
+    <meta property="og:description" content="Liquidity is the key" />
+    <link rel="canonical" href="https://hydradx.io/" />
+    <meta property="og:url" content="https://hydradx.io/" />
+    <meta property="og:site_name" content="HydraDX" />
+    <meta name="twitter:card" content="LBP Info" />
+    <meta property="twitter:title" content="HydraDX" />
+
+    <link
+      type="application/atom+xml"
+      rel="alternate"
+      href="https://hydradx.io/feed.xml"
+      title="HydraDX"
+    />
+
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.png" />
+    <link rel="stylesheet" href="assets/main.css" />
+  </head>
+  <body>
+    <div class="wrapper crt">
+      <div id="timer"></div>
+      <div class="logo"></div>
+      <h2>LIQUIDITY BOOTSTRAPPING EVENT</h2>
+      <div id="price-prediction"></div>
+      <div id="price"></div>
+    </div>
+    <div class="stuff">
+      <div class="legend">
+        <div>
+          <span class="mean">PREDICTED MEAN:</span>
+          predicted price for current mean sale rate
+        </div>
+        <div>
+          <span class="low">PREDICTED LOW:</span>
+          predicted price if no sell
+        </div>
+      </div>
+
+      <div class="buttons">
+        <a
+          href="https://balancer.exchange/#/swap/0x6b175474e89094c44da98b954eedeac495271d0f/0x6FCb6408499a7c0f242E32D77EB51fFa1dD28a7E"
+          target="blank"
+          >BALANCER POOL</a
+        >
+        <a href="https://hydradx.io" target="blank">HOME</a>
+      </div>
+    </div>
+
     <script src="https://cdn.ethers.io/lib/ethers-5.0.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@1.25.0/build/global/luxon.min.js"></script>
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
     <script src="main.js"></script>
-</body>
+  </body>
 </html>
