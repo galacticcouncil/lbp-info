@@ -243,7 +243,7 @@ async function main() {
   let chartWidth = defaultDiagramWidth;
   let chartHeight = defaultDiagramHeight;
 
-  if (document.scrollingElement.clientWidth < defaultDiagramWidth) {
+  if (document.scrollingElement.clientWidth - 32 < defaultDiagramWidth) {
     chartWidth = document.scrollingElement.clientWidth - 32;
     chartHeight =
       ((chartWidth - 32) * defaultDiagramHeight) / (defaultDiagramWidth - 32);
@@ -318,7 +318,7 @@ async function main() {
 
   window.addEventListener("resize", () => {
     console.log("aaa");
-    if (document.scrollingElement.clientWidth < defaultDiagramWidth) {
+    if (document.scrollingElement.clientWidth - 32 < defaultDiagramWidth) {
       chart.applyOptions({
         width: document.scrollingElement.clientWidth - 32,
         height:

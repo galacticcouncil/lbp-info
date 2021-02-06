@@ -15,19 +15,28 @@ html {
 }
 
 .title {
+  position: relative;
   background-color: #0d106e;
-  max-width: 900px;
+  max-width: calc(900px - 2.5em + 15px);
   margin: auto;
   margin-bottom: 0.5em;
   border: 1px solid;
   padding: 15px;
   margin-top: 1em;
+  padding-left: 2.5em;
 }
 
 .logo {
+  position: absolute;
   height: 100%;
-  width: 3em;
-  background-image: url("Eyes-Pink-transp.svg");
+  width: 2em;
+  top: 0;
+  border-right: 1px solid;
+  left: 0;
+  background-image: url(Pink-transp.svg);
+  background-size: 1.7em;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 body {
