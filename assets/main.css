@@ -199,7 +199,7 @@ body {
   pointer-events: none;
 }
 .crt {
-  animation: textShadow 1.6s infinite;
+  animation: textShadow 1s infinite;
 }
 
 h1 {
