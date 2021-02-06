@@ -14,6 +14,14 @@ html {
   cursor: crosshair;
 }
 
+#price {
+  display: inline-block;
+}
+
+.get a {
+  width: 10em;
+}
+
 .title {
   position: relative;
   background-color: #0d106e;
@@ -39,10 +47,17 @@ html {
   background-position: center;
 }
 
+.getButton {
+  text-align: center;
+  width: 10em;
+  display: inline-block;
+}
+
 body {
   width: 100%;
   height: 100%;
   margin: 0;
+  position: absolute;
   background-image: url(headerbg.png);
   background-size: cover;
 }
@@ -68,11 +83,8 @@ body {
   border-bottom: 2px dotted #52b2ed;
 }
 
-.crt {
-  overflow: hidden;
-}
-
 .stuff {
+  text-align: center;
   max-width: 900px;
   margin: auto;
   background: #0d106e;
