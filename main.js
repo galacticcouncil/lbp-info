@@ -49,23 +49,15 @@ const weights = (() => {
     return res;
 })();
 
+const currentBucket = () => series.data[series.data.length - 1].time;
+
 function spotPrice(balances, w, lotSize = 2000, fee = 0.001 / 100) {
     return balances[1] * (Math.pow(balances[0] / (balances[0] - lotSize), w[0] / w[1]) - 1) / (1 - fee) / lotSize;
 }
 
 function saleRate(lastBuckets = 10) {
-    const currentBucket = series.data[series.data.length - 1].time;
-    const calculated = -1 * swaps.filter(s => s.timestamp + bucket * 10 > currentBucket)
+    return -1 * swaps.filter(s => s.timestamp + bucket * 10 > currentBucket())
         .reduce((a, { deltas }) => a + deltas[0], 0) / lastBuckets;
-    const max = (params.start.balances[0] * 0.77 - (params.start.balances[0] - balances[0])) / ((params.end.time - currentBucket) / bucket);
-    return Math.min(max, calculated);
-}
-
-function groupBy(xs, key) {
-    return xs.reduce(function(rv, x) {
-        (rv[x[key]] = rv[x[key]] || []).push(x);
-        return rv;
-    }, {});
 }
 
 async function fetchPool() {
@@ -150,13 +142,19 @@ function predictPrice(rate = 0) {
     const swaps = series.data;
     const { time } = swaps[swaps.length - 1];
     const b = [...balances];
-    const future = [{ time, value: series.data[series.data.length - 1].close }];
+    let over = false;
+    const lastPrice = series.data[series.data.length - 1].close;
+    const future = [{ time, value: lastPrice }];
     for (let i = time + bucket; i < params.end.time; i += bucket) {
-        future.push({ time: i, value: spotPrice(b, weights[i]) });
+        let price = spotPrice(b, weights[i]);
+        if (price > lastPrice * 2) {
+            price = undefined;
+            over = true;
+        }
+        future.push({ time: i, value: price });
         if (rate) {
-            const price = spotPrice(b, weights[i], rate);
             b[0] -= rate;
-            b[1] += rate * price;
+            b[1] += rate * spotPrice(b, weights[i], rate);
         }
     }
     return future;
@@ -213,14 +211,6 @@ function fetchCountdown(block) {
     return fetch(url)
 }
 
-function getPrice(dai, daiWeight, xhdx, xhdxWeight) {
-    return (
-        Number.parseFloat(dai) /
-        Number.parseFloat(daiWeight) /
-        (Number.parseFloat(xhdx) / Number.parseFloat(xhdxWeight))
-    )
-}
-
 async function main() {
     const provider = ethers.getDefaultProvider();
     const currentBlock = await provider.getBlockNumber();
@@ -234,7 +224,7 @@ async function main() {
     past.map(updatePrice)
 
     const next = swaps.filter(s => s.timestamp > half);
-    setInterval(() => updatePrice(next.shift()), 100);
+    setInterval(() => updatePrice(next.shift()), 20);
 
     let chartWidth = defaultDiagramWidth
     let chartHeight = defaultDiagramHeight
@@ -254,6 +244,12 @@ async function main() {
         timeScale: {
             timeVisible: true,
             barSpacing: 1,
+        },
+        priceScale: {
+            scaleMargins: {
+                top: 0.1,
+                bottom: 0,
+            },
         },
         grid: {
             vertLines: {
@@ -278,6 +274,8 @@ async function main() {
     series.candle.setData(series.data);
 
     series.worstCase = chart.addLineSeries({
+        priceLineVisible: false,
+        lastValueVisible: false,
         color: '#F653A2',
         lineWidth: 1,
     });
@@ -285,11 +283,12 @@ async function main() {
     series.worstCase.setData(predicted);
 
     series.predicted = chart.addLineSeries({
+        priceLineVisible: false,
+        lastValueVisible: false,
         color: '#5EAFE1',
         lineWidth: 1,
     });
     series.predicted.setData(predictPrice(saleRate()));
-
 
     chart.timeScale().setVisibleRange({
         from: params.start.time,
