@@ -14,25 +14,41 @@ html {
   cursor: crosshair;
 }
 
+.title {
+  background-color: #0d106e;
+  max-width: 900px;
+  margin: auto;
+  margin-bottom: 0.5em;
+  border: 1px solid;
+  padding: 15px;
+  margin-top: 1em;
+}
+
+.logo {
+  height: 100%;
+  width: 3em;
+  background-image: url("Eyes-Pink-transp.svg");
+}
+
 body {
   width: 100%;
   height: 100%;
   margin: 0;
+  background-image: url(headerbg.png);
+  background-size: cover;
+}
+
+.graph {
+  margin: auto;
+  max-width: 900px;
+  background-color: #0d106e;
+  border: 1px solid #f653a2;
+  padding: 15px;
+  margin-bottom: 1em;
 }
 
 .tv-lightweight-charts {
-  margin: auto;
   margin-bottom: 1em;
-}
-
-.logo {
-  margin-top: 2em;
-  margin-bottom: 1em;
-  width: 100%;
-  height: 5em;
-  background-image: url(fullframe-logo-no-gap.svg);
-  background-repeat: no-repeat;
-  background-position: center;
 }
 
 .low {
@@ -50,6 +66,9 @@ body {
 .stuff {
   max-width: 900px;
   margin: auto;
+  background: #0d106e;
+  border: 1px solid #f653a2;
+  padding: 15px;
 }
 
 .buttons {

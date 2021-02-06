@@ -244,8 +244,9 @@ async function main() {
   let chartHeight = defaultDiagramHeight;
 
   if (document.scrollingElement.clientWidth < defaultDiagramWidth) {
-    chartWidth = document.scrollingElement.clientWidth;
-    chartHeight = (chartWidth * defaultDiagramHeight) / defaultDiagramWidth;
+    chartWidth = document.scrollingElement.clientWidth - 32;
+    chartHeight =
+      ((chartWidth - 32) * defaultDiagramHeight) / (defaultDiagramWidth - 32);
   }
 
   const chart = LightweightCharts.createChart(
@@ -319,10 +320,11 @@ async function main() {
     console.log("aaa");
     if (document.scrollingElement.clientWidth < defaultDiagramWidth) {
       chart.applyOptions({
-        width: document.scrollingElement.clientWidth,
+        width: document.scrollingElement.clientWidth - 32,
         height:
-          (document.scrollingElement.clientWidth * defaultDiagramHeight) /
-          defaultDiagramWidth,
+          ((document.scrollingElement.clientWidth - 32) *
+            defaultDiagramHeight) /
+          (defaultDiagramWidth - 32),
       });
     } else {
       chart.applyOptions({
