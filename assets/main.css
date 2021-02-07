@@ -125,10 +125,6 @@ body {
   font-size: 0.9em;
 }
 
-.end {
-  padding-right: calc(35px);
-}
-
 @keyframes textShadow {
   0% {
     text-shadow: 0.4389924193300864px 0 1px rgba(0, 30, 255, 0.5),

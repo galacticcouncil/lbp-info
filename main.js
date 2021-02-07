@@ -237,6 +237,11 @@ function updatePrice(swap) {
 }
 
 async function main() {
+  const startIn = moment.duration(params.start.time - moment().unix(), 'seconds');
+  const endIn = moment.duration(params.end.time - moment().unix(), 'seconds');
+  document.getElementsByClassName('start')[0].innerHTML = startIn > 0 ? `start in ${startIn.humanize()}` : 'started';
+  document.getElementsByClassName('end')[0].innerHTML = endIn > 0 ? `end in ${endIn.humanize()}` : 'ended';
+
   let chartWidth = defaultDiagramWidth;
   let chartHeight = defaultDiagramHeight;
 
