@@ -249,6 +249,8 @@ async function main() {
     {
       width: chartWidth,
       height: chartHeight,
+      handleScroll: false,
+      handleScale: false,
       layout: {
         textColor: "#F653A2",
         backgroundColor: "#0D106E",
