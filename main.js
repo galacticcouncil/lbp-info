@@ -229,7 +229,9 @@ function updatePrice(swap) {
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(2)} DAI`;
   if (render) {
-    series.predicted.setData(predictPrice(saleRate()));
+    if (new URLSearchParams(window.location.search).get('predict')) {
+      series.predicted.setData(predictPrice(saleRate()));
+    }
     series.worstCase.setData(predictPrice());
   }
 }
