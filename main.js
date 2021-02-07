@@ -17,13 +17,13 @@ const stablecoin = "USDC"; // perp
 const bucket = 1600;
 const params = {
   start: {
-    time: 1599628888,
-    weights: [9, 1],
-    balances: [7500000, 1333333],
+    time: 1612800000,
+    weights: [37, 3],
+    balances: [500000000, 1200000],
   },
   end: {
-    time: 1599904979,
-    weights: [3, 7],
+    time: 1613059200,
+    weights: [7, 33],
   },
 };
 let balances = params.start.balances;
@@ -227,7 +227,7 @@ function updatePrice(swap) {
   }
   balances = balances.map((b, i) => b + swap.deltas[i]);
   swaps.push(swap);
-  priceEl.innerHTML = `${price.toFixed(2)} DAI`;
+  priceEl.innerHTML = `${price.toFixed(4)} DAI`;
   if (render) {
     if (new URLSearchParams(window.location.search).get('predict')) {
       series.predicted.setData(predictPrice(saleRate()));
@@ -271,6 +271,9 @@ async function main() {
       height: chartHeight,
       handleScroll: false,
       handleScale: false,
+      localization: {
+        priceFormatter: price => price.toFixed(4)
+      },
       layout: {
         textColor: "#F653A2",
         backgroundColor: "#0D106E",
@@ -324,9 +327,10 @@ async function main() {
     lineWidth: 2,
   });
 
-  fetchAllSwaps(5000).then((swaps) => {
-    const half = (params.end.time - params.start.time) / 3 + params.start.time;
-    const past = swaps.filter((s) => s.timestamp <= half);
+  fetchAllSwaps(5000).then(swaps => {
+    // const half = (params.end.time - params.start.time) / 3 + params.start.time;
+    // const past = swaps.filter((s) => s.timestamp <= half);
+    const past = [];
     if (past.length) {
       past.map(updatePrice);
     } else {
@@ -341,8 +345,8 @@ async function main() {
       to: params.end.time,
     });
 
-    const next = swaps.filter((s) => s.timestamp > half);
-    setInterval(() => updatePrice(next.shift()), 40);
+    // const next = swaps.filter((s) => s.timestamp > half);
+    // setInterval(() => updatePrice(next.shift()), 40);
 
     resize();
   });
