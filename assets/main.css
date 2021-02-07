@@ -19,15 +19,8 @@ html {
 }
 
 .get {
-  font-size: 1.2em;
+  font-size: 1.5em;
   display: inline-block;
-  background-repeat: no-repeat;
-  background-image: url("Eyes-Pink-transp.svg");
-  padding-left: 1.7em;
-}
-
-.get a {
-  width: 10em;
 }
 
 .footer {
@@ -40,7 +33,7 @@ html {
   max-width: calc(900px - 2.5em + 15px);
   margin: auto;
   margin-bottom: 0.5em;
-  border: 1px solid;
+  border: 4px double #f653a2;
   padding: 15px;
   margin-top: 1em;
   padding-left: 2.5em;
@@ -81,7 +74,7 @@ body {
   margin: auto;
   max-width: 900px;
   background-color: #0d106e;
-  border: 1px solid #f653a2;
+  border: 4px double #f653a2;
   padding: 15px;
   margin-bottom: 1em;
 }
@@ -107,7 +100,7 @@ body {
   max-width: 900px;
   margin: auto;
   background: #0d106e;
-  border: 1px solid #f653a2;
+  border: 4px double #f653a2;
   padding: 15px;
   padding-bottom: 1em;
 }
