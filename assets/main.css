@@ -267,12 +267,15 @@ h6 {
 
 a,
 a:visited {
-  color: #f653a2;
+  color: #52b2ed;
 }
 
 a {
-  background-color: #0d106e;
-  border: 2px outset #52b2ed;
+  display: inline-block;
+  background-color: #0c36a1;
+  border: 5px outset #0c36a1;
+  box-shadow: 6px 6px black;
+  color: #52b2ed;
   text-decoration: none;
   padding: 0.3em;
   margin: 0.3em;
