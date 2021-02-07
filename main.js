@@ -31,7 +31,7 @@ let balances = params.start.balances;
 const series = { data: [] };
 const swaps = [];
 
-const priceEl = document.getElementById('price');
+const priceEl = document.getElementById("price");
 
 const weights = (() => {
   const start = params.start.weights;
@@ -82,7 +82,7 @@ async function getLatestPrice() {
   const usdcDecimals = 6;
   const rawPrice = await pool.getSpotPrice(daiAddress, xhdxAddress);
   const price = Number.parseFloat(
-      ethers.utils.formatUnits(rawPrice, usdcDecimals)
+    ethers.utils.formatUnits(rawPrice, usdcDecimals)
   );
 
   return price.toFixed(4);
@@ -91,9 +91,9 @@ async function getLatestPrice() {
 function fetchCountdown(block) {
   const ETHERSCAN_APIKEY = "C9KKK6QF3REYE2UKRZKF5GFB2R2FQ5BWRE";
   const url =
-      `https://api.etherscan.io/api` +
-      `?module=block&action=getblockcountdown&` +
-      `blockno=${block}&apikey=${ETHERSCAN_APIKEY}`;
+    `https://api.etherscan.io/api` +
+    `?module=block&action=getblockcountdown&` +
+    `blockno=${block}&apikey=${ETHERSCAN_APIKEY}`;
   return fetch(url);
 }
 
@@ -181,7 +181,7 @@ async function fetchAllSwaps(count) {
 
 function predictPrice(rate = 0) {
   const swaps = series.data;
-  const lastSwap = swaps[swaps.length - 1]
+  const lastSwap = swaps[swaps.length - 1];
   const { time } = lastSwap || params.start;
   const b = [...balances];
   let over = false;
@@ -241,8 +241,26 @@ async function main() {
   if (document.scrollingElement.clientWidth - 32 < defaultDiagramWidth) {
     chartWidth = document.scrollingElement.clientWidth - 32;
     chartHeight =
-      ((chartWidth - 32) * defaultDiagramHeight) / (defaultDiagramWidth - 32);
+      ((document.scrollingElement.clientWidth - 32) * defaultDiagramHeight) /
+      (defaultDiagramWidth - 32);
   }
+
+  const resize = () => {
+    if (document.scrollingElement.clientWidth - 32 < defaultDiagramWidth) {
+      chart.applyOptions({
+        width: document.scrollingElement.clientWidth - 32,
+        height:
+          ((document.scrollingElement.clientWidth - 32) *
+            defaultDiagramHeight) /
+          (defaultDiagramWidth - 32),
+      });
+    } else {
+      chart.applyOptions({
+        width: defaultDiagramWidth,
+        height: defaultDiagramHeight,
+      });
+    }
+  };
 
   const chart = LightweightCharts.createChart(
     document.getElementById(diagramId),
@@ -275,7 +293,7 @@ async function main() {
         },
       },
     }
-  )
+  );
 
   series.chart = chart;
 
@@ -304,13 +322,17 @@ async function main() {
     lineWidth: 2,
   });
 
-  fetchAllSwaps(5000).then(swaps => {
+  fetchAllSwaps(5000).then((swaps) => {
     const half = (params.end.time - params.start.time) / 3 + params.start.time;
     const past = swaps.filter((s) => s.timestamp <= half);
     if (past.length) {
       past.map(updatePrice);
     } else {
-      updatePrice({ timestamp: params.start.time, price: spotPrice(balances, params.start.weights), deltas: [0, 0] });
+      updatePrice({
+        timestamp: params.start.time,
+        price: spotPrice(balances, params.start.weights),
+        deltas: [0, 0],
+      });
     }
     series.chart.timeScale().setVisibleRange({
       from: params.start.time,
@@ -319,24 +341,14 @@ async function main() {
 
     const next = swaps.filter((s) => s.timestamp > half);
     setInterval(() => updatePrice(next.shift()), 40);
+
+    resize();
   });
 
+  resize();
+
   window.addEventListener("resize", () => {
-    console.log("aaa");
-    if (document.scrollingElement.clientWidth - 32 < defaultDiagramWidth) {
-      chart.applyOptions({
-        width: document.scrollingElement.clientWidth - 32,
-        height:
-          ((document.scrollingElement.clientWidth - 32) *
-            defaultDiagramHeight) /
-          (defaultDiagramWidth - 32),
-      });
-    } else {
-      chart.applyOptions({
-        width: defaultDiagramWidth,
-        height: defaultDiagramHeight,
-      });
-    }
+    resize();
   });
 }
 
