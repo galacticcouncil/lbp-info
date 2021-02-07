@@ -19,7 +19,7 @@ const params = {
   start: {
     time: 1612800000,
     weights: [37, 3],
-    balances: [500000000, 1200000],
+    balances: [498362339.302326258, 1250000],
   },
   end: {
     time: 1613059200,
@@ -54,7 +54,7 @@ const weights = (() => {
 
 const currentBucket = () => series.data[series.data.length - 1].time;
 
-function spotPrice(balances, w, lotSize = 2000, fee = 0.001 / 100) {
+function spotPrice(balances, w, lotSize = 2000, fee = 0.9 / 100) {
   return (
     (balances[1] *
       (Math.pow(balances[0] / (balances[0] - lotSize), w[0] / w[1]) - 1)) /
