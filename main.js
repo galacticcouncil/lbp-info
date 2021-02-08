@@ -333,7 +333,8 @@ async function main() {
       handleScroll: false,
       handleScale: false,
       localization: {
-        priceFormatter: price => price.toFixed(4)
+        priceFormatter: price => price.toFixed(4),
+        timeFormatter: timestamp => moment.unix(timestamp).format('D.M. H:m')
       },
       layout: {
         textColor: "#F653A2",
