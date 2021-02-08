@@ -458,7 +458,7 @@ async function main() {
       tokenAmountIn,
       tokenAmountOut
     });
-    console.log('swap!', swap, tokenAmountIn, tokenAmountOut);
+    console.log('swap!', swap.deltas);
     updatePrice(swap);
   });
 }
