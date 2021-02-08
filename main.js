@@ -2,26 +2,31 @@
 
 const defaultDiagramWidth = 900;
 const defaultDiagramHeight = 400;
+const network = 'homestead';
+const provider = new ethers.providers.FallbackProvider([
+  new ethers.providers.EtherscanProvider(network, 'C9KKK6QF3REYE2UKRZKF5GFB2R2FQ5BWRE'),
+  new ethers.providers.InfuraProvider(network)
+]);
+const blockTime = 13.1;
 const diagramId = "price-prediction";
-const poolAddress = "0xbfb4b21887ebb3542bde0a9997d481debc6e072b"; // perp
-// const poolAddress = "0x38131a37f74a52141e14d7aef40a876066ffe25f" // tap
-// const poolAddress = "0x86eca06d0f1fec418fac3bd3ef5382a9f8981f0d" // apy
-// const poolAddress = "0xc99317ceef9ed2ab9ff0ec99f64f3dd61b09a6b2" // furucombo
-const daiAddress = "0xax0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
-const xhdxAddress = "0xbC396689893D065F41bc2C6EcbeE5e0085233447";
+const lbpAddress = "0x6428006d00a224116c3e8a4fca72ac9bb7d42327";
+const poolAddress = "0xf014fc5d0f02c19d617a30a745ab86a8ca32c92f";
+const daiAddress = "0x6B175474E89094C44Da98b954EedeAC495271d0F";
+const xhdxAddress = "0x6fcb6408499a7c0f242e32d77eb51ffa1dd28a7e";
 const graphApi =
   "https://api.thegraph.com/subgraphs/name/balancer-labs/balancer";
-const stablecoin = "USDC"; // perp
-// const stablecoin = 'DAI'; // tap
+const stablecoin = "DAI";
 
 const bucket = 1600;
 const params = {
   start: {
+    block: 11817007,
     time: 1612800000,
     weights: [37, 3],
     balances: [498362339.302326258, 1250000],
   },
   end: {
+    block: 11836793,
     time: 1613059200,
     weights: [7, 33],
   },
@@ -33,24 +38,63 @@ const swaps = [];
 
 const priceEl = document.getElementById("price");
 
-const weights = (() => {
-  const start = params.start.weights;
-  const end = params.end.weights;
-  let time = params.start.time;
-  const res = {
-    [time]: start,
-    [params.end.time]: end,
-  };
-  const steps = Math.ceil((params.end.time - params.start.time) / bucket);
-  for (let i = 1; i < steps; i++) {
-    time += bucket;
-    res[time] = [
-      start[0] - (i / steps) * (start[0] - end[0]),
-      start[1] + (i / steps) * (end[1] - start[1]),
-    ];
+let weights = [];
+
+const lAbi = [
+  {
+    "inputs": [],
+    "name": "bPool",
+    "outputs": [
+      {
+        "internalType": "contract IBPool",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
   }
-  return res;
-})();
+];
+
+const pAbi = [
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "caller",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "tokenIn",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "tokenOut",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokenAmountIn",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "tokenAmountOut",
+        "type": "uint256"
+      }
+    ],
+    "name": "LOG_SWAP",
+    "type": "event"
+  }
+];
 
 const currentBucket = () => series.data[series.data.length - 1].time;
 
@@ -77,24 +121,12 @@ async function getLatestPrice() {
   const abi = [
     "function getSpotPrice(address tokenIn, address tokenOut) view returns (uint)",
   ];
-  const provider = ethers.getDefaultProvider();
   const pool = new ethers.Contract(poolAddress, abi, provider);
-  const usdcDecimals = 6;
   const rawPrice = await pool.getSpotPrice(daiAddress, xhdxAddress);
   const price = Number.parseFloat(
-    ethers.utils.formatUnits(rawPrice, usdcDecimals)
+    ethers.utils.formatUnits(rawPrice, 24)
   );
-
-  return price.toFixed(4);
-}
-
-function fetchCountdown(block) {
-  const ETHERSCAN_APIKEY = "C9KKK6QF3REYE2UKRZKF5GFB2R2FQ5BWRE";
-  const url =
-    `https://api.etherscan.io/api` +
-    `?module=block&action=getblockcountdown&` +
-    `blockno=${block}&apikey=${ETHERSCAN_APIKEY}`;
-  return fetch(url);
+  return Number(price);
 }
 
 async function fetchPool() {
@@ -203,9 +235,9 @@ function predictPrice(rate = 0) {
 }
 
 function updatePrice(swap) {
+  const { timestamp, price, deltas } = swap;
   const render = !!series.candle;
   const bar = series.data[series.data.length - 1];
-  const { timestamp, price } = swap;
   if (!bar || timestamp >= bar.time + bucket) {
     const newBar = {};
     newBar.open = bar ? bar.close : price;
@@ -225,7 +257,7 @@ function updatePrice(swap) {
       series.candle.update(bar);
     }
   }
-  balances = balances.map((b, i) => b + swap.deltas[i]);
+  balances = balances.map((b, i) => b + deltas[i]);
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
   if (render) {
@@ -237,10 +269,34 @@ function updatePrice(swap) {
 }
 
 async function main() {
-  const startIn = moment.duration(params.start.time - moment().unix(), 'seconds');
-  const endIn = moment.duration(params.end.time - moment().unix(), 'seconds');
+  const now = moment().unix();
+  const currentBlock = await provider.getBlock('latest');
+  const timeOfBlock = async block => block > currentBlock.number
+      ? currentBlock.timestamp + Math.round((block - currentBlock.number) * blockTime)
+      : (await provider.getBlock(block)).timestamp;
+  [params.start.time, params.end.time] = await Promise.all([timeOfBlock(params.start.block), timeOfBlock(params.end.block)]);
+  const startIn = moment.duration(params.start.time - now, 'seconds');
+  const endIn = moment.duration(params.end.time - now, 'seconds');
   document.getElementsByClassName('start')[0].innerHTML = startIn > 0 ? `start in ${startIn.humanize()}` : 'started';
   document.getElementsByClassName('end')[0].innerHTML = endIn > 0 ? `end in ${endIn.humanize()}` : 'ended';
+  weights = (() => {
+    const start = params.start.weights;
+    const end = params.end.weights;
+    let time = params.start.time;
+    const res = {
+      [time]: start,
+      [params.end.time]: end,
+    };
+    const steps = Math.ceil((params.end.time - params.start.time) / bucket);
+    for (let i = 1; i < steps; i++) {
+      time += bucket;
+      res[time] = [
+        start[0] - (i / steps) * (start[0] - end[0]),
+        start[1] + (i / steps) * (end[1] - start[1]),
+      ];
+    }
+    return res;
+  })();
 
   let chartWidth = defaultDiagramWidth;
   let chartHeight = defaultDiagramHeight;
@@ -332,34 +388,74 @@ async function main() {
     lineWidth: 2,
   });
 
-  fetchAllSwaps(5000).then(swaps => {
-    // const half = (params.end.time - params.start.time) / 3 + params.start.time;
-    // const past = swaps.filter((s) => s.timestamp <= half);
-    const past = [];
-    if (past.length) {
-      past.map(updatePrice);
-    } else {
-      updatePrice({
-        timestamp: params.start.time,
-        price: spotPrice(balances, params.start.weights),
-        deltas: [0, 0],
-      });
-    }
-    series.chart.timeScale().setVisibleRange({
-      from: params.start.time,
-      to: params.end.time,
-    });
-
-    // const next = swaps.filter((s) => s.timestamp > half);
-    // setInterval(() => updatePrice(next.shift()), 40);
-
-    resize();
-  });
-
   resize();
 
   window.addEventListener("resize", () => {
     resize();
+  });
+
+  const pool = await fetchPool();
+  const [swaps, lastPrice] = await Promise.all([
+      fetchAllSwaps(Number(pool.swapsCount)),
+      getLatestPrice()
+  ]);
+  console.log(swaps);
+  const past = swaps.filter(s => s.timestamp >= params.start.time);
+  if (past.length) {
+    past.map(updatePrice);
+  } else {
+    updatePrice({
+      timestamp: params.start.time,
+      price: spotPrice(balances, params.start.weights),
+      deltas: [0, 0],
+    });
+  }
+  if (lastPrice && now >= params.start.time) {
+    updatePrice({
+      timestamp: now,
+      price: lastPrice,
+      deltas: [0, 0],
+    });
+  }
+  series.chart.timeScale().setVisibleRange({
+    from: params.start.time,
+    to: params.end.time,
+  });
+  resize();
+
+  const lbp = new ethers.Contract(lbpAddress, lAbi, provider);
+  const bpool = new ethers.Contract(poolAddress, pAbi, provider);
+  lbp.on({topics: ['0xe211b87500000000000000000000000000000000000000000000000000000000'] }, async () => {
+    console.log('poked!');
+    updatePrice({
+      timestamp: moment().unix(),
+      price: await getLatestPrice(),
+      deltas: [0, 0]
+    })
+  })
+  bpool.on('LOG_SWAP', (id, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut) => {
+    const [tokenInSym, tokenOutSym] = [tokenIn, tokenOut]
+        .map(token => token.toLowerCase() === daiAddress.toLowerCase() ? 'DAI' : 'xHDX');
+    if (tokenIn.toLowerCase() === daiAddress.toLowerCase()) {
+      [tokenAmountIn, tokenAmountOut] = [
+        ethers.utils.formatUnits(tokenAmountIn),
+        ethers.utils.formatUnits(tokenAmountOut, 12)
+      ];
+    } else {
+      [tokenAmountIn, tokenAmountOut] = [
+        ethers.utils.formatUnits(tokenAmountOut, 12),
+        ethers.utils.formatUnits(tokenAmountIn)
+      ];
+    }
+    updatePrice(calculateSwap({
+      userAddress: { id },
+      tokenIn,
+      tokenOut,
+      tokenInSym,
+      tokenOutSym,
+      tokenAmountIn,
+      tokenAmountOut
+    }));
   });
 }
 
