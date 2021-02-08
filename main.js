@@ -450,6 +450,7 @@ async function main() {
     }
     const swap = calculateSwap({
       userAddress: { id },
+      timestamp: moment().unix(),
       tokenIn,
       tokenOut,
       tokenInSym,
