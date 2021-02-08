@@ -400,7 +400,7 @@ async function main() {
       fetchAllSwaps(Number(pool.swapsCount)),
       getLatestPrice()
   ]);
-  console.log(swaps);
+  console.log(swaps, lastPrice);
   const past = swaps.filter(s => s.timestamp >= params.start.time);
   if (past.length) {
     past.map(updatePrice);
@@ -444,11 +444,11 @@ async function main() {
       ];
     } else {
       [tokenAmountIn, tokenAmountOut] = [
-        ethers.utils.formatUnits(tokenAmountOut, 12),
-        ethers.utils.formatUnits(tokenAmountIn)
+        ethers.utils.formatUnits(tokenAmountIn, 12),
+        ethers.utils.formatUnits(tokenAmountOut)
       ];
     }
-    updatePrice(calculateSwap({
+    const swap = calculateSwap({
       userAddress: { id },
       tokenIn,
       tokenOut,
@@ -456,7 +456,9 @@ async function main() {
       tokenOutSym,
       tokenAmountIn,
       tokenAmountOut
-    }));
+    });
+    console.log('swap!', swap, tokenAmountIn, tokenAmountOut);
+    updatePrice(swap);
   });
 }
 
