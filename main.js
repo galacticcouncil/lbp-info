@@ -20,7 +20,7 @@ const stablecoin = "DAI";
 const bucket = 1600;
 const params = {
   start: {
-    block: 11817007,
+    block: 11817006,
     time: 1612800000,
     weights: [37, 3],
     balances: [498362339.302326258, 1250000],
