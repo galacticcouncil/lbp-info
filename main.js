@@ -101,6 +101,19 @@ const pAbi = [
 
 const currentBucket = () => series.data[series.data.length - 1].time;
 
+function formatMoney(amount, decimalCount = 2, decimal = ".", thousands = ",") {
+  try {
+    decimalCount = Math.abs(decimalCount);
+    decimalCount = isNaN(decimalCount) ? 2 : decimalCount;
+    const negativeSign = amount < 0 ? "-" : "";
+    let i = parseInt(amount = Math.abs(Number(amount) || 0).toFixed(decimalCount)).toString();
+    let j = (i.length > 3) ? i.length % 3 : 0;
+    return negativeSign + (j ? i.substr(0, j) + thousands : '') + i.substr(j).replace(/(\d{3})(?=\d)/g, "$1" + thousands) + (decimalCount ? decimal + Math.abs(amount - i).toFixed(decimalCount).slice(2) : "");
+  } catch (e) {
+    console.log(e)
+  }
+}
+
 function spotPrice(balances, w, lotSize = 2000, fee = 0.9 / 100) {
   return (
     (balances[1] *
@@ -256,8 +269,8 @@ function updatePrice(swap) {
   balances = balances.map((b, i) => b + deltas[i]);
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
-  soldEl.innerHTML = `${Math.round((params.start.balances[0]-balances[0])/params.start.balances[0]*100)}% xHDX sold`;
-  raisedEl.innerHTML = `${((balances[1] - params.start.balances[1])/1000000).toFixed(1)}m DAI raised`;
+  soldEl.innerHTML = `${((params.start.balances[0]-balances[0])/params.start.balances[0]*100).toFixed(1)}% xHDX sold`;
+  raisedEl.innerHTML = `${formatMoney(balances[1] - params.start.balances[1], 0)} DAI raised`;
   if (!init) {
     const predict = new URLSearchParams(window.location.search).get('predict');
     if (predict) {
