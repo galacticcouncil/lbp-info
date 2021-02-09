@@ -107,14 +107,12 @@ function spotPrice(balances, w, lotSize = 2000, fee = 0.9 / 100) {
   );
 }
 
-function saleRate(lastBuckets = 10) {
-  return (
-    (-1 *
-      swaps
-        .filter((s) => s.timestamp + bucket * 10 > currentBucket())
-        .reduce((a, { deltas }) => a + deltas[0], 0)) /
-    lastBuckets
-  );
+function saleRate(bounded = 0, lastBuckets = 10) {
+  const currentBucket = series.data[series.data.length - 1].time;
+  const calculated = -1 * swaps.filter(s => s.timestamp + bucket * 10 > currentBucket)
+      .reduce((a, { deltas }) => a + deltas[0], 0) / lastBuckets;
+  const max = (params.start.balances[0] * bounded - (params.start.balances[0] - balances[0])) / ((params.end.time - currentBucket) / bucket);
+  return bounded ? Math.min(max, calculated) : calculated;
 }
 
 async function getLatestPrice() {
@@ -261,8 +259,10 @@ function updatePrice(swap) {
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
   if (render) {
-    if (new URLSearchParams(window.location.search).get('predict')) {
-      series.predicted.setData(predictPrice(saleRate()));
+    const predict = new URLSearchParams(window.location.search).get('predict');
+    if (predict) {
+      const bound = Number(predict);
+      series.predicted.setData(predictPrice(saleRate(bound || 0.86)));
     }
     series.worstCase.setData(predictPrice());
   }
