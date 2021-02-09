@@ -35,8 +35,11 @@ let balances = params.start.balances;
 
 const series = { data: [] };
 const swaps = [];
+let init = true;
 
 const priceEl = document.getElementById("price");
+const soldEl = document.getElementById("sold");
+const raisedEl = document.getElementById("raised");
 
 let weights = [];
 
@@ -234,7 +237,6 @@ function predictPrice(rate = 0) {
 
 function updatePrice(swap) {
   const { timestamp, price, deltas } = swap;
-  const render = !!series.candle;
   const bar = series.data[series.data.length - 1];
   if (!bar || timestamp >= bar.time + bucket) {
     const newBar = {};
@@ -244,21 +246,19 @@ function updatePrice(swap) {
     newBar.close = price;
     newBar.time = bar ? bar.time + bucket : timestamp;
     series.data.push(newBar);
-    if (render) {
-      series.candle.setData(series.data);
-    }
+    series.candle.setData(series.data);
   } else {
     bar.close = price;
     bar.high = Math.max(bar.high, price);
     bar.low = Math.min(bar.low, price);
-    if (render) {
-      series.candle.update(bar);
-    }
+    series.candle.update(bar);
   }
   balances = balances.map((b, i) => b + deltas[i]);
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
-  if (render) {
+  soldEl.innerHTML = `${Math.round((params.start.balances[0]-balances[0])/params.start.balances[0]*100)}% xHDX sold`;
+  raisedEl.innerHTML = `${((balances[1] - params.start.balances[1])/1000000).toFixed(1)}m DAI raised`;
+  if (!init) {
     const predict = new URLSearchParams(window.location.search).get('predict');
     if (predict) {
       const bound = Number(predict);
@@ -403,7 +403,10 @@ async function main() {
   console.log(swaps, lastPrice);
   const past = swaps.filter(s => s.timestamp >= params.start.time);
   if (past.length) {
+    let last = past.pop();
     past.map(updatePrice);
+    init = false;
+    updatePrice(last);
   } else {
     updatePrice({
       timestamp: params.start.time,
