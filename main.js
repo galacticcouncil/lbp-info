@@ -450,7 +450,7 @@ async function main() {
       deltas: [0, 0]
     })
   })
-  bpool.on('LOG_SWAP', (id, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut) => {
+  bpool.on('LOG_SWAP', async (id, tokenIn, tokenOut, tokenAmountIn, tokenAmountOut, { blockNumber }) => {
     const [tokenInSym, tokenOutSym] = [tokenIn, tokenOut]
         .map(token => token.toLowerCase() === daiAddress.toLowerCase() ? 'DAI' : 'xHDX');
     if (tokenIn.toLowerCase() === daiAddress.toLowerCase()) {
@@ -464,9 +464,15 @@ async function main() {
         ethers.utils.formatUnits(tokenAmountOut)
       ];
     }
+    let timestamp;
+    try {
+      timestamp = (await provider.getBlock(blockNumber)).timestamp || moment().unix();
+    } catch (e) {
+      timestamp = moment().unix();
+    }
     const swap = calculateSwap({
       userAddress: { id },
-      timestamp: moment().unix(),
+      timestamp,
       tokenIn,
       tokenOut,
       tokenInSym,
