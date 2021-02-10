@@ -269,7 +269,7 @@ function updatePrice(swap) {
   balances = balances.map((b, i) => b + deltas[i]);
   swaps.push(swap);
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
-  soldEl.innerHTML = `${((params.start.balances[0]-balances[0])/params.start.balances[0]*100).toFixed(1)}% xHDX sold`;
+  soldEl.innerHTML = `${Math.round((params.start.balances[0]-balances[0])/params.start.balances[0]*100)}% xHDX sold`;
   raisedEl.innerHTML = `${formatMoney(balances[1] - params.start.balances[1], 0)} DAI raised`;
   if (!init) {
     const predict = new URLSearchParams(window.location.search).get('predict');
