@@ -416,7 +416,7 @@ async function main() {
   const pool = await fetchPool();
   const [swaps, lastPrice] = await Promise.all([
       fetchAllSwaps(Number(pool.swapsCount)),
-      getLatestPrice()
+      null //getLatestPrice()
   ]);
   console.log(swaps, lastPrice);
   const past = swaps.filter(s => s.timestamp >= params.start.time);
@@ -432,6 +432,12 @@ async function main() {
       deltas: [0, 0],
     });
   }
+  // final price hadcoded
+  updatePrice({
+    timestamp: params.start.time,
+    price: spotPrice(balances, params.end.weights),
+    deltas: [0, 0],
+  });
   const now = moment().unix();
   if (lastPrice && now >= params.start.time) {
     updatePrice({
