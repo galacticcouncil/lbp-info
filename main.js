@@ -432,10 +432,10 @@ async function main() {
       deltas: [0, 0],
     });
   }
-  // final price hadcoded
+  // final price hardcoded
   updatePrice({
     timestamp: params.start.time,
-    price: spotPrice(balances, params.end.weights),
+    price: 0.0806,
     deltas: [0, 0],
   });
   const now = moment().unix();
