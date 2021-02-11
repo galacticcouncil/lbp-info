@@ -281,7 +281,7 @@ function updatePrice(swap) {
   }
 }
 
-async function main() {
+async function refreshTime() {
   const now = moment().unix();
   const currentBlock = await provider.getBlock('latest');
   const timeOfBlock = async block => block > currentBlock.number
@@ -290,8 +290,13 @@ async function main() {
   [params.start.time, params.end.time] = await Promise.all([timeOfBlock(params.start.block), timeOfBlock(params.end.block)]);
   const startIn = moment.duration(params.start.time - now, 'seconds');
   const endIn = moment.duration(params.end.time - now, 'seconds');
+  console.log('ends in', `${endIn.hours()} hours ${endIn.minutes()} minutes ${endIn.seconds()} seconds`);
   document.getElementsByClassName('start')[0].innerHTML = startIn > 0 ? `start in ${startIn.humanize()}` : 'started';
   document.getElementsByClassName('end')[0].innerHTML = endIn > 0 ? `end in ${endIn.humanize()}` : 'ended';
+}
+
+async function main() {
+  await refreshTime();
   weights = (() => {
     const start = params.start.weights;
     const end = params.end.weights;
@@ -427,6 +432,7 @@ async function main() {
       deltas: [0, 0],
     });
   }
+  const now = moment().unix();
   if (lastPrice && now >= params.start.time) {
     updatePrice({
       timestamp: now,
@@ -483,6 +489,7 @@ async function main() {
     console.log('swap!', swap.deltas);
     updatePrice(swap);
   });
+  setInterval(refreshTime, 20000);
 }
 
 main();
