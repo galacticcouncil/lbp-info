@@ -169,7 +169,12 @@ async function fetchPool() {
     .then((res) => res.data.pools[0]);
 }
 
-async function fetchSwaps(skip = 0) {
+async function fetchSwapsLocal() {
+  return fetch('./assets/swaps.json')
+    .then((res) => res.json());
+}
+
+async function fetchSwaps(skip = 0, timestamp = 0, order = 'asc') {
   return fetch(graphApi, {
     method: "POST",
     headers: {
@@ -179,7 +184,7 @@ async function fetchSwaps(skip = 0) {
       query: `
                 query {
                   pools(where: {id: "${poolAddress}"}) {
-                    swaps(first: 1000, skip: ${skip}, orderBy: timestamp, orderDirection: asc) {
+                    swaps(first: 1000, skip: ${skip}, orderBy: timestamp, where: {timestamp_gt: ${timestamp}}, orderDirection: ${order}) {
                       timestamp
                       id
                       tokenIn
@@ -216,13 +221,24 @@ function calculateSwap(swap) {
 }
 
 async function fetchAllSwaps(count) {
-  let i = 0;
+  try {
+    return await fetchSwapsLocal();
+  } catch (e) {
+    console.log('no locally cached swaps');
+  }
   let calls = [];
-  do {
-    calls.push(fetchSwaps(i));
-    i += 1000;
-  } while (i < count);
-  return Promise.all(calls).then((calls) => calls.flat());
+  let timestamp = 0;
+  while (calls.length < count) {
+    let requests = [];
+    for (let i = 0; i < 5000 && calls.length < count; i += 1000) {
+      requests.push(fetchSwaps(i, timestamp));
+    }
+    calls = [...calls, ...(await Promise.all(requests).then((requests) => requests.flat()))];
+    const newTimestamp = calls.reduce((m, {timestamp}) => Math.max(m, timestamp), 0);
+    if (newTimestamp === timestamp) break;
+    timestamp = newTimestamp
+  }
+  return calls;
 }
 
 function predictPrice(rate = 0) {
@@ -290,7 +306,6 @@ async function refreshTime() {
   [params.start.time, params.end.time] = await Promise.all([timeOfBlock(params.start.block), timeOfBlock(params.end.block)]);
   const startIn = moment.duration(params.start.time - now, 'seconds');
   const endIn = moment.duration(params.end.time - now, 'seconds');
-  console.log('ends in', `${endIn.hours()} hours ${endIn.minutes()} minutes ${endIn.seconds()} seconds`);
   document.getElementsByClassName('start')[0].innerHTML = startIn > 0 ? `start in ${startIn.humanize()}` : 'started';
   document.getElementsByClassName('end')[0].innerHTML = endIn > 0 ? `end in ${endIn.humanize()}` : 'ended';
 }
