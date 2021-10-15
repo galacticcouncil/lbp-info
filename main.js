@@ -18,19 +18,26 @@ const graphApi =
 const stablecoin = "DAI";
 
 const bucket = 1600;
+
 const params = {
   start: {
     block: 11817006,
-    time: 1612800000,
+    time: 1612803045,
     weights: [37, 3],
     balances: [498362339.302326258, 1250000],
   },
   end: {
     block: 11836793,
-    time: 1613059200,
+    time: 1613066813,
     weights: [7, 33],
   },
+  tradingFee: 0,
+  repayFee: 0.2,
 };
+
+const target = params.start.balances[1];
+let pot = 0;
+let repayAt = 0;
 let balances = params.start.balances;
 
 const series = { data: [] };
@@ -114,7 +121,7 @@ function formatMoney(amount, decimalCount = 2, decimal = ".", thousands = ",") {
   }
 }
 
-function spotPrice(balances, w, lotSize = 2000, fee = 0.9 / 100) {
+function spotPrice(balances, w, lotSize = 2000, fee = 0.9 / 10) {
   return (
     (balances[1] *
       (Math.pow(balances[0] / (balances[0] - lotSize), w[0] / w[1]) - 1)) /
@@ -264,8 +271,34 @@ function predictPrice(rate = 0) {
   return future;
 }
 
+function weightsInTime(timestamp) {
+  const start = params.start.weights;
+  const end = params.end.weights;
+  const duration = params.end.time - params.start.time;
+  const time = timestamp - params.start.time;
+  return [
+    start[0] - (time / duration) * (start[0] - end[0]),
+    start[1] + (time / duration) * (end[1] - start[1]),
+  ]
+  // return params.start.weights;
+}
+
+function applyFee(swap) {
+  const { timestamp, deltas: [token] } = swap;
+  const price = spotPrice(balances, weightsInTime(timestamp), token, params.tradingFee);
+  let stable = token * price || 0;
+  if (stable > 0 && pot < target) {
+    const rfee = stable * params.repayFee;
+    stable -= rfee;
+    pot += rfee;
+    repayAt = timestamp;
+  }
+  let deltas = [token, -stable];
+  return {...swap, price, deltas};
+}
+
 function updatePrice(swap) {
-  const { timestamp, price, deltas } = swap;
+  const { timestamp, price, deltas } = applyFee(swap);
   const bar = series.data[series.data.length - 1];
   if (!bar || timestamp >= bar.time + bucket) {
     const newBar = {};
@@ -287,6 +320,7 @@ function updatePrice(swap) {
   priceEl.innerHTML = `${price.toFixed(4)} DAI`;
   soldEl.innerHTML = `${Math.round((params.start.balances[0]-balances[0])/params.start.balances[0]*100)}% xHDX sold`;
   raisedEl.innerHTML = `${formatMoney(balances[1] - params.start.balances[1], 0)} DAI raised`;
+  series.candle.setMarkers([{ time: repayAt, position: 'belowBar', color: '#e91e63', shape: 'arrowUp', text: 'seed repayed' }]);
   if (!init) {
     const predict = new URLSearchParams(window.location.search).get('predict');
     if (predict) {
@@ -297,21 +331,7 @@ function updatePrice(swap) {
   }
 }
 
-async function refreshTime() {
-  const now = moment().unix();
-  const currentBlock = await provider.getBlock('latest');
-  const timeOfBlock = async block => block > currentBlock.number
-      ? currentBlock.timestamp + Math.round((block - currentBlock.number) * blockTime)
-      : (await provider.getBlock(block)).timestamp;
-  [params.start.time, params.end.time] = await Promise.all([timeOfBlock(params.start.block), timeOfBlock(params.end.block)]);
-  const startIn = moment.duration(params.start.time - now, 'seconds');
-  const endIn = moment.duration(params.end.time - now, 'seconds');
-  document.getElementsByClassName('start')[0].innerHTML = startIn > 0 ? `start in ${startIn.humanize()}` : 'started';
-  document.getElementsByClassName('end')[0].innerHTML = endIn > 0 ? `end in ${endIn.humanize()}` : 'ended';
-}
-
 async function main() {
-  await refreshTime();
   weights = (() => {
     const start = params.start.weights;
     const end = params.end.weights;
@@ -434,12 +454,13 @@ async function main() {
       null //getLatestPrice()
   ]);
   console.log(swaps, lastPrice);
-  const past = swaps.filter(s => s.timestamp >= params.start.time);
+  let past = swaps.filter(s => s.timestamp >= params.start.time);
   if (past.length) {
-    let last = past.pop();
+    // past = past.map((swap, i) => i % 2 === 0
+    //     ? {...swap, deltas: [500000, 0]}
+    //     : {...swap, deltas: [-500000, 0]} );
     past.map(updatePrice);
     init = false;
-    updatePrice(last);
   } else {
     updatePrice({
       timestamp: params.start.time,
@@ -447,12 +468,6 @@ async function main() {
       deltas: [0, 0],
     });
   }
-  // final price hardcoded
-  updatePrice({
-    timestamp: params.start.time,
-    price: 0.0806,
-    deltas: [0, 0],
-  });
   const now = moment().unix();
   if (lastPrice && now >= params.start.time) {
     updatePrice({
@@ -510,7 +525,6 @@ async function main() {
     console.log('swap!', swap.deltas);
     updatePrice(swap);
   });
-  setInterval(refreshTime, 20000);
 }
 
 main();
