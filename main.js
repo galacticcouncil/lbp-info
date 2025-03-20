@@ -220,12 +220,14 @@ function calculateSwap(swap) {
   return { ...swap, price, deltas };
 }
 
-async function fetchAllSwaps(count) {
+async function fetchAllSwaps() {
   try {
     return await fetchSwapsLocal();
   } catch (e) {
     console.log('no locally cached swaps');
   }
+  const pool = await fetchPool();
+  const count = Number(pool.swapsCount);
   let calls = [];
   let timestamp = 0;
   while (calls.length < count) {
@@ -428,9 +430,8 @@ async function main() {
     resize();
   });
 
-  const pool = await fetchPool();
   const [swaps, lastPrice] = await Promise.all([
-      fetchAllSwaps(Number(pool.swapsCount)),
+      fetchAllSwaps(),
       null //getLatestPrice()
   ]);
   console.log(swaps, lastPrice);
